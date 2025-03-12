@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -24,6 +25,12 @@ type Todo struct {
 	TaskName string `json:"task_name"`
 	Status   string `json:"status"`
 	Users    []User `gorm:"many2many:user_todos;"`
+}
+
+type ToDoInput struct {
+	TaskName string `json:"task_name"`
+	Status   string `json:"status"`
+	Title    string `json:"title"`
 }
 
 type Department struct {
@@ -86,9 +93,33 @@ func JSONMiddleware(next http.Handler) http.Handler {
 
 // Handler to create a todo
 func CreateTodoHandler(w http.ResponseWriter, r *http.Request) {
-	todo := Todo{TaskName: "Sample Todo", Status: "pending"}
-	DB.Create(&todo)
-	fmt.Fprintf(w, "Todo created: %+v", todo)
+	// Parse the request body
+	var todoInput ToDoInput
+	if err := json.NewDecoder(r.Body).Decode(&todoInput); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	todo := Todo{
+		Status: todoInput.Status,
+	}
+
+	if todoInput.TaskName != "" {
+		todo.TaskName = todoInput.TaskName
+	} else if todoInput.Title != "" {
+		todo.TaskName = todoInput.Title
+	}
+
+	// Save to database
+	if err := DB.Create(&todo).Error; err != nil {
+		http.Error(w, "Failed to create todo", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the created todo
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(todo)
 }
 
 // Handler to list todos
@@ -105,8 +136,8 @@ func main() {
 	// Set up router
 	r := mux.NewRouter()
 	r.Use(JSONMiddleware)
-	r.HandleFunc("/todos", GetTodosHandler).Methods("GET")
-	r.HandleFunc("/todos", CreateTodoHandler).Methods("POST")
+	r.HandleFunc("/v1/todos", GetTodosHandler).Methods("GET")
+	r.HandleFunc("/v1/todos", CreateTodoHandler).Methods("POST")
 
 	fmt.Println("Server running on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
