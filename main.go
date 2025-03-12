@@ -24,6 +24,17 @@ type Todo struct {
 	Users  []User `gorm:"many2many:user_todos;"`
 }
 
+type Department struct {
+	ID    uint   `gorm:"primaryKey"`
+	Name  string `json:"name"`
+	Todos []Todo `gorm:"many2many:department_todos;"`
+}
+
+type DepartmentTodo struct {
+	ID           uint `gorm:"primaryKey"`
+	DepartmentID uint `gorm:"index"` // Foreign key for Department
+	TodoID       uint `gorm:"index"` // Foreign key for Todo
+}
 type UserTodo struct {
 	ID     uint `gorm:"primaryKey"`
 	UserID uint `gorm:"index"` // Foreign key for User
@@ -43,7 +54,7 @@ func InitDB() {
 	}
 
 	// AutoMigrate tables
-	DB.AutoMigrate(&User{}, &Todo{}, &UserTodo{})
+	DB.AutoMigrate(&User{}, &Todo{}, &UserTodo{}, Department{}, DepartmentTodo{})
 	fmt.Println("Database connected and migrated successfully")
 }
 
