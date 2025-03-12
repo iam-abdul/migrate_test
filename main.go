@@ -8,6 +8,8 @@ import (
 	"github.com/gorilla/mux"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+
+	"github.com/go-gormigrate/gormigrate/v2"
 )
 
 // Todo represents a task
@@ -18,10 +20,10 @@ type User struct {
 }
 
 type Todo struct {
-	ID     uint   `gorm:"primaryKey"`
-	Title  string `json:"title"`
-	Status string `json:"status"`
-	Users  []User `gorm:"many2many:user_todos;"`
+	ID       uint   `gorm:"primaryKey"`
+	TaskName string `json:"task_name"`
+	Status   string `json:"status"`
+	Users    []User `gorm:"many2many:user_todos;"`
 }
 
 type Department struct {
@@ -54,7 +56,24 @@ func InitDB() {
 	}
 
 	// AutoMigrate tables
-	DB.AutoMigrate(&User{}, &Todo{}, &UserTodo{}, Department{}, DepartmentTodo{})
+	// DB.AutoMigrate(&User{}, &Todo{}, &UserTodo{}, Department{}, DepartmentTodo{})
+
+	m := gormigrate.New(DB, gormigrate.DefaultOptions, []*gormigrate.Migration{
+		{
+			ID: "20250312_rename_title_column",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.Exec("ALTER TABLE todos CHANGE COLUMN title task_name VARCHAR(255);").Error
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Exec("ALTER TABLE todos CHANGE COLUMN task_name title VARCHAR(255);").Error
+			},
+		},
+	})
+
+	if err := m.Migrate(); err != nil {
+		log.Fatal("Could not apply migration:", err)
+	}
+
 	fmt.Println("Database connected and migrated successfully")
 }
 
@@ -67,7 +86,7 @@ func JSONMiddleware(next http.Handler) http.Handler {
 
 // Handler to create a todo
 func CreateTodoHandler(w http.ResponseWriter, r *http.Request) {
-	todo := Todo{Title: "Sample Todo", Status: "pending"}
+	todo := Todo{TaskName: "Sample Todo", Status: "pending"}
 	DB.Create(&todo)
 	fmt.Fprintf(w, "Todo created: %+v", todo)
 }
