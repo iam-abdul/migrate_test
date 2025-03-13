@@ -119,7 +119,7 @@ func CreateTodoHandler(w http.ResponseWriter, r *http.Request) {
 // Handler to list todos
 func GetTodosHandler(w http.ResponseWriter, r *http.Request) {
 	var todos []Todo
-	if err := DB.Find(&todos).Error; err != nil {
+	if err := DB.Preload("Users").Find(&todos).Error; err != nil {
 		http.Error(w, "Failed to fetch todos", http.StatusInternalServerError)
 		return
 	}
