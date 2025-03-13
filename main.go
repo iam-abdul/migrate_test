@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -43,16 +44,37 @@ func JSONMiddleware(next http.Handler) http.Handler {
 
 // Handler to create a todo
 func CreateTodoHandler(w http.ResponseWriter, r *http.Request) {
-	todo := Todo{Title: "Sample Todo", Status: "pending"}
-	DB.Create(&todo)
-	fmt.Fprintf(w, "Todo created: %+v", todo)
+	var todo Todo
+
+	// Decode the request body into the todo struct
+	if err := json.NewDecoder(r.Body).Decode(&todo); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Create the todo in the database
+	if err := DB.Create(&todo).Error; err != nil {
+		http.Error(w, "Failed to create todo", http.StatusInternalServerError)
+		return
+	}
+
+	// Send JSON response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(todo)
 }
 
 // Handler to list todos
 func GetTodosHandler(w http.ResponseWriter, r *http.Request) {
 	var todos []Todo
-	DB.Find(&todos)
-	fmt.Fprintf(w, "Todos: %+v", todos)
+	if err := DB.Find(&todos).Error; err != nil {
+		http.Error(w, "Failed to fetch todos", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(todos)
 }
 
 func main() {
